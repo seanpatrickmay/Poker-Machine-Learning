@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+
+from HumanPokerPlayer import HumanPokerPlayer
+from HoldemPokerHand import HoldemPokerHand
+from BadRobotPokerPlayer import BadRobotPokerPlayer
+from CallCheckBotPlayer import CallCheckBotPlayer
+
+class PokerGame:
+    def __init__(self, players, bigBlind, smallBlind, numHands):
+        self.players = players.copy()
+        self.numHands = numHands
+        self.bigBlind = bigBlind
+        self.smallBlind = smallBlind
+        self.startChips = 1000
+        self.bigBlindWon = False
+        self.buttonWon = False
+
+    def run(self):
+        handsPlayed = 0
+        chipDiff = [0, 0]
+        for hand in range(self.numHands):
+            self.players[0].won = False
+            self.players[1].won = False
+            self.buttonWon = False
+            self.bigBlindWon = False
+            newHand = HoldemPokerHand(self.players, self.smallBlind, self.bigBlind)
+            returnedPlayers = newHand.run()
+            buttonNumWon = returnedPlayers[0].numChips - 1000
+            bigBlindNumWon = returnedPlayers[1].numChips - 1000
+            chipDiff[0] += buttonNumWon
+            chipDiff[1] += bigBlindNumWon
+            if buttonNumWon > 0:
+                self.buttonWon = True
+            if bigBlindNumWon > 0:
+                self.bigBlindWon = True
+            if self.buttonWon and not self.bigBlindWon:
+                #print(returnedPlayers[0].handToString(), "total + 1, wins + 1")
+                #print(returnedPlayers[1].handToString(), "total + 1")
+                self.players = returnedPlayers
+                self.players[0].won = True
+                self.collectHandData()
+            elif self.bigBlindWon and not self.buttonWon:
+                #print(returnedPlayers[0].handToString(), "total + 1")
+                #print(returnedPlayers[1].handToString(), "total + 1, wins + 1")
+                self.players = returnedPlayers
+                self.players[1].won = True
+                self.collectHandData()
+            returnedPlayers[0].numChips = 1000
+            returnedPlayers[1].numChips = 1000
+            self.players = returnedPlayers
+            handsPlayed += 1
+        print("\n\nAfter", handsPlayed, "Hands:\n")
+        for player in range(len(self.players)):
+            print("Player:", self.players[player].name(), "at pos", str(self.players[player].pos), "won/lost", (chipDiff[player] / handsPlayed), "chips per hand.")
+        self.getRankings()
+
+    def collectHandData(self):
+        with open('buttonHeadsUpCollect.txt', "r+") as file:
+            player = self.players[0]
+            playerVals = player.handToVals()
+            line = player.handToLine()
+            #print("LINE:", line)
+            allLines = file.readlines()
+            lineCurrent = allLines[line]
+            #print("LINECURRENT:", lineCurrent)
+            firstVal = playerVals[0][0]
+            secondVal = playerVals[1][0]
+            suited = "o"
+            if playerVals[0][1] == playerVals[1][1]:
+                suited = "s"
+            #print(str(firstVal), str(secondVal), suited)
+            if playerVals[0][1] == playerVals[1][1]:
+                suited = "s"
+            winCount = 0
+            totalCount = 0
+            #print("LINECURRENT LEN:", len(lineCurrent))
+            if len(lineCurrent) <= 2:
+                if player.won:
+                    winCount = 1
+                totalCount = 1
+            elif len(lineCurrent) > 2:
+                lineVals = lineCurrent.split()
+                #print("LINEVALS:", lineVals)
+                winCount = int(lineVals[3])
+                if player.won:
+                    winCount += 1
+                #print("WINCOUNT:", winCount)
+                totalCount = int(lineVals[4]) + 1
+                #print("TOTALCOUNT:", totalCount)
+            winPercent = ((winCount * 1000) // totalCount) / 10
+            allLines[line] = str(firstVal) + " " + str(secondVal) + " " + suited + " " + str(winCount) + " " + str(totalCount) + " " + str(winPercent) + "\n"
+            file.seek(0)
+            #print("ALLLINES LEN:", len(allLines))
+            file.writelines(allLines)
+        with open('bigBlindHeadsUpCollect.txt', "r+") as file:
+            player = self.players[1]
+            playerVals = player.handToVals()
+            line = player.handToLine()
+            #print("LINE:", line)
+            allLines = file.readlines()
+            lineCurrent = allLines[line]
+            #print("LINECURRENT:", lineCurrent)
+            firstVal = playerVals[0][0]
+            secondVal = playerVals[1][0]
+            suited = "o"
+            if playerVals[0][1] == playerVals[1][1]:
+                suited = "s"
+            #print(str(firstVal), str(secondVal), suited)
+            if playerVals[0][1] == playerVals[1][1]:
+                suited = "s"
+            winCount = 0
+            totalCount = 0
+            #print("LINECURRENT LEN:", len(lineCurrent))
+            if len(lineCurrent) <= 2:
+                if player.won:
+                    winCount = 1
+                totalCount = 1
+            elif len(lineCurrent) > 2:
+                lineVals = lineCurrent.split()
+                #print("LINEVALS:", lineVals)
+                winCount = int(lineVals[3])
+                if player.won:
+                    winCount += 1
+                #print("WINCOUNT:", winCount)
+                totalCount = int(lineVals[4]) + 1
+                #print("TOTALCOUNT:", totalCount)
+            winPercent = ((winCount * 1000) // totalCount) / 10
+            allLines[line] = str(firstVal) + " " + str(secondVal) + " " + suited + " " + str(winCount) + " " + str(totalCount) + " " + str(winPercent) + "\n"
+            file.seek(0)
+            #print("ALLLINES LEN:", len(allLines))
+            file.writelines(allLines)
+
+    def getRankings(self):
+        with open('buttonHeadsUpRankings.txt', 'w') as rankingsFile:
+            with open('buttonHeadsUpCollect.txt', 'r') as collectionFile:
+                rankings = []
+                collectionLines = collectionFile.readlines()
+                for line in collectionLines:
+                    splitLine = line.split()
+                    if len(splitLine) == 6:
+                        rankings.append(splitLine)
+                sortedRankings = sorted(rankings, key=lambda ranking: ranking[5], reverse = True)
+                shortenedSortedRankings = []
+                for ranking in sortedRankings:
+                    firstPart = ranking[0:3]
+                    secondPart = ranking[5:]
+                    ranking = firstPart + secondPart
+                    shortenedSortedRankings.append(ranking)
+                rankingLines = []
+                for rank in shortenedSortedRankings:
+                    rankingLines.append(" ".join(rank))
+                rankingLines = "\n".join(rankingLines)
+                rankingsFile.seek(0)
+                rankingsFile.writelines(rankingLines)
+        with open('bigBlindHeadsUpRankings.txt', 'w') as rankingsFile:
+            with open('bigBlindHeadsUpCollect.txt', 'r') as collectionFile:
+                rankings = []
+                collectionLines = collectionFile.readlines()
+                for line in collectionLines:
+                    splitLine = line.split()
+                    if len(splitLine) == 6:
+                        rankings.append(splitLine)
+                sortedRankings = sorted(rankings, key=lambda ranking: ranking[5], reverse = True)
+                shortenedSortedRankings = []
+                for ranking in sortedRankings:
+                    firstPart = ranking[0:3]
+                    secondPart = ranking[5:]
+                    ranking = firstPart + secondPart
+                    shortenedSortedRankings.append(ranking)
+                rankingLines = []
+                for rank in shortenedSortedRankings:
+                    rankingLines.append(" ".join(rank))
+                rankingLines = "\n".join(rankingLines)
+                rankingsFile.seek(0)
+                rankingsFile.writelines(rankingLines)
+
+
+player1 = CallCheckBotPlayer(1000, 0)
+player2 = CallCheckBotPlayer(1000, 1)
+'''
+player3 = PokerPlayer(1000)
+player4 = PokerPlayer(1000)
+player5 = PokerPlayer(1000)
+player6 = PokerPlayer(1000)
+player7 = PokerPlayer(1000)
+player8 = PokerPlayer(1000)
+player9 = PokerPlayer(1000)'''
+
+
+playerList = [player1, player2]
+''', player3, player4, player5, player6, player7, player8, player9]'''
+
+fiveHandGame = PokerGame(playerList, 10, 5, 10000)
+fiveHandGame.run()
